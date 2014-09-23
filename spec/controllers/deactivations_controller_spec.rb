@@ -58,4 +58,16 @@ describe DeactivationsController, '#create' do
       )
     end
   end
+
+  context "when repo is private" do
+    it "raises FailedToActivate" do
+      repo = create(:repo, private: true)
+      membership = create(:membership, repo: repo)
+      user = membership.user
+      stub_sign_in(user)
+
+      expect { post :create, repo_id: repo.id, format: :json }.
+        to raise_error(DeactivationsController::CannotDeactivatePrivateRepo)
+    end
+  end
 end
