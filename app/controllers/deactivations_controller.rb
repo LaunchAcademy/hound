@@ -1,10 +1,10 @@
 class DeactivationsController < ApplicationController
   class FailedToActivate < StandardError; end
-  class CannotDeactivatePrivateRepo < StandardError; end
+  class CannotDeactivateRepoWithSubscription < StandardError; end
 
   respond_to :json
 
-  before_action :check_privacy
+  before_action :check_for_subscription
 
   def create
     if activator.deactivate(repo, session[:github_token])
@@ -29,7 +29,7 @@ class DeactivationsController < ApplicationController
     RepoActivator.new
   end
 
-  def check_privacy
-    raise CannotDeactivatePrivateRepo if repo.private?
+  def check_for_subscription
+    raise CannotDeactivateRepoWithSubscription if repo.subscription
   end
 end
