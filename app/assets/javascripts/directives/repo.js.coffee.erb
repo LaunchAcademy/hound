@@ -2,63 +2,72 @@ App.directive 'repo', ['Subscription', 'StripeCheckout', (Subscription, StripeCh
   scope: true
   templateUrl: '/templates/repo'
   link: (scope, element, attributes) ->
-    repo = scope.repo
-    scope.processing = false
+    createActivation = ->
+      scope.processing = true
 
-    activate = ->
-      repo.$activate()
-        .then(->
+      scope.repo.$activate()
+        .catch(
+          -> alert('Your repo failed to activate.')
+        ).finally(->
           scope.processing = false
-        ).catch(-> alert('Your repo failed to activate.'))
+        )
 
-    deactivate = ->
-      repo.$deactivate()
-        .then(->
+    createDeactivation = ->
+      scope.processing = true
+
+      scope.repo.$deactivate()
+        .catch(
+          -> alert('Your repo failed to deactivate.')
+        ).finally(->
           scope.processing = false
-        ).catch(-> alert('Your repo failed to deactivate.'))
+        )
 
     createSubscription = (stripeToken) ->
       scope.processing = true
 
       subscription = new Subscription(
-        repo_id: repo.id
+        repo_id: scope.repo.id
         card_token: stripeToken.id
         email_address: stripeToken.email
       )
 
       subscription.$save().then((response) ->
-        repo.active = true
-        repo.stripe_subscription_id = response.stripe_subscription_id
+        scope.repo.active = true
+        scope.repo.stripe_subscription_id = response.stripe_subscription_id
         scope.processing = false
-      , ->
-        scope.processing = false
+      ).catch(->
         alert('Your subscription failed.')
+      ).finally(->
+        scope.processing = false
+      )
+
+    deleteSubscription = ->
+      scope.processing = true
+
+      subscription = new Subscription(repo_id: scope.repo.id)
+
+      subscription.$delete().then(->
+        scope.repo.active = false
+        scope.repo.stripe_subscription_id = null
+      ).catch(->
+        alert('Your repo could not be disabled')
+      ).finally(->
+        scope.processing = false
       )
 
     scope.toggle = ->
-      if repo.active
-        if repo.stripe_subscription_id
-          scope.processing = true
-          subscription = new Subscription(repo_id: repo.id)
-          subscription.$delete().then((response) ->
-            repo.active = false
-            repo.stripe_subscription_id = null
-            scope.processing = false
-          , ->
-            alert('Your repo could not be disabled')
-            scope.processing = false
-          )
+      if scope.repo.active
+        if scope.repo.stripe_subscription_id
+          deleteSubscription()
         else
-          scope.processing = true
-          deactivate(repo)
+          createDeactivation()
       else
-        if repo.private
+        if scope.repo.private
           StripeCheckout.open(
-            name: repo.full_plan_name,
-            amount: repo.price_in_cents,
+            name: scope.repo.full_plan_name,
+            amount: scope.repo.price_in_cents,
             createSubscription
           )
         else
-          scope.processing = true
-          activate(repo)
+          createActivation()
 ]
